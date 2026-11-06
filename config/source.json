@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "repository": "Orochi771127/championship-2026",
+  "versions": [
+    {
+      "commit": "63776034296faa32f3498f94396c0e825403a340",
+      "committedAt": "2026-11-04T20:21:05Z"
+    }
+  ],
+  "assetPrefix": "assets/production/characters/"
+}

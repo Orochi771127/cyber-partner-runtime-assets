@@ -1,0 +1,62 @@
+name: Publish verified character runtime
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-runtime-assets
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout delivery configuration
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build all retained immutable versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const c=JSON.parse(require("fs").readFileSync("config/source.json","utf8")); for(const v of c.versions){if(!/^[a-f0-9]{40}$/.test(v.commit))process.exit(1); console.log(v.commit)}' > source-commits.txt
+          git clone --filter=blob:none --no-checkout https://github.com/Orochi771127/championship-2026.git source
+          git -C source sparse-checkout init --cone
+          git -C source sparse-checkout set .claude .github src scripts docs assets tests tools reports
+          while IFS= read -r source_commit; do
+            git -C source checkout --detach "$source_commit"
+            npm ci --prefix source
+            npm run build:playtest --prefix source
+            npm run validate:playtest --prefix source
+            node scripts/build-runtime-site.mjs --source source --out site
+          done < source-commits.txt
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified runtime assets
+        id: deployment
+        uses: actions/deploy-pages@v4
